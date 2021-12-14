@@ -1,10 +1,11 @@
 class DogsController < ApplicationController
   before_action :set_dog, only: [:show, :edit, :update, :destroy]
+  before_action :authenticate_owner, only: [:edit, :update]
 
   # GET /dogs
   # GET /dogs.json
   def index
-    @dogs = Dog.all
+    @dogs = Dog.paginate(page: params[:page], per_page: 5)
   end
 
   # GET /dogs/1
@@ -24,12 +25,10 @@ class DogsController < ApplicationController
   # POST /dogs
   # POST /dogs.json
   def create
-    @dog = Dog.new(dog_params)
+    @dog = Dog.new(dog_params.merge({owner: current_user}))
 
     respond_to do |format|
       if @dog.save
-        @dog.images.attach(params[:dog][:image]) if params[:dog][:image].present?
-
         format.html { redirect_to @dog, notice: 'Dog was successfully created.' }
         format.json { render :show, status: :created, location: @dog }
       else
@@ -43,8 +42,8 @@ class DogsController < ApplicationController
   # PATCH/PUT /dogs/1.json
   def update
     respond_to do |format|
-      if @dog.update(dog_params)
-        @dog.images.attach(params[:dog][:image]) if params[:dog][:image].present?
+      if @dog.update({owner: current_user}.merge(dog_params))
+        @dog.images.attach(params[:dog][:images]) if params[:dog][:images].present?
 
         format.html { redirect_to @dog, notice: 'Dog was successfully updated.' }
         format.json { render :show, status: :ok, location: @dog }
@@ -72,8 +71,18 @@ class DogsController < ApplicationController
     @dog = Dog.find(params[:id])
   end
 
+  def authenticate_owner
+    authenticate_user!
+
+    if @dog.owner == current_user
+       return
+    else
+       redirect_to root_url
+    end
+  end
+
   # Never trust parameters from the scary internet, only allow the white list through.
   def dog_params
-    params.require(:dog).permit(:name, :description, :images)
+    params.require(:dog).permit(:name, :description, images: [])
   end
 end
